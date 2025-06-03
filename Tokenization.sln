@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.35821.62 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tokenization", "Tokenization\Tokenization.csproj", "{475CAAB2-56F9-459A-833D-124AECC2A4F9}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{475CAAB2-56F9-459A-833D-124AECC2A4F9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{475CAAB2-56F9-459A-833D-124AECC2A4F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{475CAAB2-56F9-459A-833D-124AECC2A4F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{475CAAB2-56F9-459A-833D-124AECC2A4F9}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {8E78B998-FE08-40C3-9574-19BA8D11400C}
+	EndGlobalSection
+EndGlobal
