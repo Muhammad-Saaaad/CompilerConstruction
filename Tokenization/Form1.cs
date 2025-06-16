@@ -26,6 +26,8 @@ namespace Tokenization
         public Dictionary<String, String> dtype_var; 
         public Dictionary<String, String> var_value;
 
+
+
         public bool add_word(String first_word, String datatype) // first_word = "a = 10 | a" here you must have a data type
         {
             if (first_word.Contains("=")) // means inilization "num a = 10"
@@ -39,6 +41,7 @@ namespace Tokenization
                     MessageBox.Show($"Variable {variable} already exists: ");
                     return false;
                 }
+                
 
                 dtype_var[variable] = datatype; // add to dtype_var dictionary
                 var_value[variable] = value; // add to var_value
@@ -188,10 +191,10 @@ namespace Tokenization
             Regex ILine = new Regex(@"^[_a-zA-Z][_a-zA-Z0-9]*\s*=\s*((""[^""]*"")|('[^']')|([0-9]*[0-9]*[.]?[0-9][0-9]*)|(true|false))\s*;$");
 
             //int initialization and declaration single and multiple
-            Regex IntIdLine = new Regex(@"^num\s+([_a-zA-Z][_a-zA-Z0-9]*\s*(=\s*\d+)?\s*)(,\s*[_a-zA-Z][_a-zA-Z0-9]*\s*(=\s*\d+)?\s*)*;$");
+            Regex IntIdLine = new Regex(@"^num\s+([_a-zA-Z][_a-zA-Z0-9]*\s*(=\s*[\w\s()+\-*/%]+)?\s*)(,\s*[_a-zA-Z][_a-zA-Z0-9]*\s*(=\s*[\w\s()+\-*/%]+)?\s*)*;$");
             
             //float | decimal initialization and declaration single and multiple
-            Regex FloatIdLine = new Regex(@"^(float|decimal)\s+([_a-zA-Z][_a-zA-Z0-9]*\s*(=\s*\d+(\.\d+)?\s*)?)(\s*,\s*[_a-zA-Z][_a-zA-Z0-9]*\s*(=\s*\d+(\.\d+)?\s*)?)*\s*;$");
+            Regex FloatIdLine = new Regex(@"^(float|decimal)\s+([_a-zA-Z][_a-zA-Z0-9]*\s*(=\s*[\w\s()+\-*/%.]+)?\s*)(,\s*[_a-zA-Z][_a-zA-Z0-9]*\s*(=\s*[\w\s()+\-*/%.]+)?\s*)*;$");
 
             // text(String) initialization and declaration single and multiple
 
