@@ -29,7 +29,7 @@
         private void InitializeComponent()
         {
             this.richTextBox1 = new System.Windows.Forms.RichTextBox();
-            this.richTextBox2 = new System.Windows.Forms.RichTextBox();
+            this.richBoxOutput = new System.Windows.Forms.RichTextBox();
             this.button1 = new System.Windows.Forms.Button();
             this.listBox1 = new System.Windows.Forms.ListBox();
             this.label1 = new System.Windows.Forms.Label();
@@ -46,14 +46,14 @@
             this.richTextBox1.TabIndex = 0;
             this.richTextBox1.Text = "";
             // 
-            // richTextBox2
+            // richBoxOutput
             // 
-            this.richTextBox2.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.richTextBox2.Location = new System.Drawing.Point(98, 392);
-            this.richTextBox2.Name = "richTextBox2";
-            this.richTextBox2.Size = new System.Drawing.Size(520, 207);
-            this.richTextBox2.TabIndex = 1;
-            this.richTextBox2.Text = "";
+            this.richBoxOutput.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.richBoxOutput.Location = new System.Drawing.Point(98, 392);
+            this.richBoxOutput.Name = "richBoxOutput";
+            this.richBoxOutput.Size = new System.Drawing.Size(520, 207);
+            this.richBoxOutput.TabIndex = 1;
+            this.richBoxOutput.Text = "";
             // 
             // button1
             // 
@@ -102,9 +102,8 @@
             this.lbValid.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.lbValid.Location = new System.Drawing.Point(279, 602);
             this.lbValid.Name = "lbValid";
-            this.lbValid.Size = new System.Drawing.Size(58, 20);
+            this.lbValid.Size = new System.Drawing.Size(0, 20);
             this.lbValid.TabIndex = 6;
-            this.lbValid.Text = "label 1";
             this.lbValid.UseMnemonic = false;
             // 
             // Form1
@@ -117,7 +116,7 @@
             this.Controls.Add(this.label1);
             this.Controls.Add(this.listBox1);
             this.Controls.Add(this.button1);
-            this.Controls.Add(this.richTextBox2);
+            this.Controls.Add(this.richBoxOutput);
             this.Controls.Add(this.richTextBox1);
             this.Name = "Form1";
             this.Text = "Form1";
@@ -130,7 +129,7 @@
         #endregion
 
         private System.Windows.Forms.RichTextBox richTextBox1;
-        private System.Windows.Forms.RichTextBox richTextBox2;
+        private System.Windows.Forms.RichTextBox richBoxOutput;
         private System.Windows.Forms.Button button1;
         private System.Windows.Forms.ListBox listBox1;
         private System.Windows.Forms.Label label1;

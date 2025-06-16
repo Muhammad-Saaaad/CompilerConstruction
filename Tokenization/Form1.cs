@@ -214,7 +214,7 @@ namespace Tokenization
             Regex inputLine = new Regex(@"^[_A-z][_A-z0-9]*\s*=\s*input\s*\(\s*""[\w\s=:]*""\s*\)\s*;$");
 
             string[] Input = input.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
-            richTextBox2.Text = "";
+            richBoxOutput.Text = "";
 
             foreach (var line_ in Input)
             {
@@ -268,22 +268,18 @@ namespace Tokenization
                 }
                 else if (printSLine.IsMatch(line)) // print 
                 {
-
-                    foreach (var stmt in line)
+                    try
                     {
-                        var inner = ExtractPrintContent(stmt);
+                        var inner = ExtractPrintContent(line);
                         var output = EvaluateExpression(inner, var_value);
-                        Console.WriteLine(output);
+                        richBoxOutput.AppendText(output + "\n"); // append the output to rich text box
+
                     }
-
-                    //string[] coutwords = line.Split('"'); 
-
-                    //listBox1.Items.Add("print" + "\n");
-
-                    //listBox1.Items.Add(coutwords[1].Trim() + "\n");
-
-                    //lbValid.Text = "Build Sucessfull";
-
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error processing '{line}': {ex.Message}");
+                        break;       // stop processing any further print()s
+                    }
                 }
 
                 else if (inputLine.IsMatch(line)) // input issue!
@@ -386,50 +382,158 @@ namespace Tokenization
         }
 
         // 3) evaluate each segment, then concatenate results
-        static string EvaluateExpression(string expr, Dictionary<string, object> vars)
+        static string EvaluateExpression(string expr, Dictionary<string, string> vars)
         {
             expr = expr.Trim();
-            if (string.IsNullOrEmpty(expr))
-                return "";
+            if (expr == "") return "";
 
-            //expr = expr.Replace("\\", "/");
+            expr = Regex.Replace(
+                expr,
+                @"(?<l>\([^()]+\)|\d+(\.\d+)?)\s*%\s*(?<r>\([^()]+\)|\d+(\.\d+)?)",
+                m => {
+                    var table0 = new DataTable();
+                    var lVal = Convert.ToDouble(table0.Compute(m.Groups["l"].Value, ""));
+                    var rVal = Convert.ToDouble(table0.Compute(m.Groups["r"].Value, ""));
+                    return (lVal % rVal).ToString();
+                }
+             );
 
-            // replace variables with their values (strings get quoted)
-            foreach (var kvp in vars)
+            if (!expr.Contains("\""))
             {
-                string pat = $@"\b{kvp.Key}\b";
-                string val = kvp.Value is string ? $"\"{kvp.Value}\"" : kvp.Value.ToString();
-                expr = Regex.Replace(expr, pat, val);
+                // replace numeric vars only
+                var exprNum = expr;
+                foreach (var kv in vars)
+                {
+                    if (double.TryParse(kv.Value, out _))
+                    {
+                        exprNum = Regex.Replace(exprNum, $@"\b{kv.Key}\b", kv.Value);
+                    }
+                }
+                // now if it's purely math (digits, ops, parens, whitespace)
+                if (Regex.IsMatch(exprNum, @"^[0-9\.\s\+\-\*\/\(\)%]+$"))
+                {
+                    var tableFast = new DataTable();
+                    var fastVal = tableFast.Compute(exprNum, "");
+                    return fastVal.ToString();
+                }
             }
 
+            // 1) Split top‑level on '+'
             var segments = SplitOnTopLevelPlus(expr);
-            string result = "";
 
-            foreach (var seg in segments)
+            var result = "";
+            var numericPrefix = new List<string>();
+            int i = 0;
+
+            // 2) Collect leading pure‑numeric segments
+            for (; i < segments.Count; i++)
             {
-                var t = seg.Trim();
-                // is it a double‑quoted string?
+                var t = segments[i].Trim();
+                // pure numeric math? … OR a single variable whose value is numeric
+                if (Regex.IsMatch(t, @"^[0-9\.\s\-\*\/\%\(\)]+$") ||
+                    (Regex.IsMatch(t, @"^[A-Za-z_]\w*$")
+                     && vars.TryGetValue(t, out var vstr)
+                     && double.TryParse(vstr, out _)))
+                {
+                    numericPrefix.Add(t);
+                    continue;
+                }
+                break;
+            }
+
+            // 3) If there was at least one numeric segment, compute them all at once
+            if (numericPrefix.Count > 0)
+            {
+                // build a purely‑numeric expression, e.g. ["a","b*2","3"] → ["1","2*2","3"]
+                var folded = numericPrefix.Select(seg =>
+                {
+                    var s = seg.Trim();
+                    // single var? swap in its number
+                    if (Regex.IsMatch(s, @"^[A-Za-z_]\w*$")
+                        && vars.TryGetValue(s, out var vstr))
+                        return vstr;
+                    return s;  // number‑literal or full math chunk
+                });
+                var numExpr = string.Join("+", folded);
+                var table = new DataTable();
+                var val = table.Compute(numExpr, "");
+                result += val.ToString();
+            }
+
+            // 4) Process the remaining segments one by one
+            for (; i < segments.Count; i++)
+            {
+                var t = segments[i].Trim();
+
+                // a) String literal? → strip quotes & append
                 if (t.StartsWith("\"") && t.EndsWith("\""))
                 {
                     result += t.Substring(1, t.Length - 2);
+                    continue;
                 }
-                else
+
+                // b) Single variable? → append its raw string value
+                if (Regex.IsMatch(t, @"^[A-Za-z_]\w*$"))
                 {
-                    // otherwise treat as math and compute
-                    var table = new DataTable();
-                    try
+                    if (!vars.ContainsKey(t))
+                        throw new InvalidOperationException($"Unknown variable '{t}'");
+
+                    result += vars[t];
+                    continue;
+                }
+
+                // c) Single numeric literal? → append it (as text)
+                if (Regex.IsMatch(t, @"^[0-9]+(\.[0-9]+)?$"))
+                {
+                    result += t;
+                    continue;
+                }
+
+                // d) Otherwise it's a standalone arithmetic expression (e.g. "(x*y+2)")
+                //    — replace variables, check numeric, then compute:
+                // — replace only *your* variables, skip anything else (like 'Mod')
+                foreach (Match m in Regex.Matches(t, @"\b[A-Za-z_]\w*\b"))
+                {
+                    var name = m.Value;
+                    if (!vars.TryGetValue(name, out var valStr))
+                        continue;             // skip non-vars (e.g. Mod)
+                    if (!double.TryParse(valStr, out _))
+                        throw new InvalidOperationException(
+                            $"Variable '{name}' is not numeric but used in arithmetic.");
+
+                    t = Regex.Replace(t, $@"\b{name}\b", valStr);
+                }
+
+                var modPattern = new Regex(@"(?<l>\([^()]+\)|\d+(\.\d+)?)\s*%\s*(?<r>\([^()]+\)|\d+(\.\d+)?)");
+                while (modPattern.IsMatch(t))
+                {
+                    t = modPattern.Replace(t, m =>
                     {
-                        var val = table.Compute(t, "");
-                        result += val.ToString();
-                    }
-                    catch
-                    {
-                        result += "[Error]";
-                    }
+                        var leftExpr = m.Groups["l"].Value;
+                        var rightExpr = m.Groups["r"].Value;
+                        var table = new DataTable();
+                        // first compute each side (parentheses or literal)
+                        var lVal = Convert.ToDouble(table.Compute(leftExpr, ""));
+                        var rVal = Convert.ToDouble(table.Compute(rightExpr, ""));
+                        return (lVal % rVal).ToString();
+                    });
+                }
+                var computable = t;
+                try
+                {
+                    var table2 = new DataTable();
+                    var val2 = table2.Compute(computable, "");
+                    result += val2.ToString();
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException(
+                        $"Error evaluating numeric segment '{t}': {ex.Message}", ex);
                 }
             }
 
             return result;
         }
+
     }
 }
