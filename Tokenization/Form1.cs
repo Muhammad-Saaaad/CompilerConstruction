@@ -26,11 +26,10 @@ namespace Tokenization
         public Dictionary<String, String> dtype_var; 
         public Dictionary<String, String> var_value;
 
-
-
         public bool add_word(String first_word, String datatype) // first_word = "a = 10 | a" here you must have a data type
         {
-            if (first_word.Contains("=")) // means inilization "num a = 10"
+            if (first_word.Contains("=") && !first_word.Contains("+") && !first_word.Contains("-") && !first_word.Contains("*")
+                && !first_word.Contains("/") && !first_word.Contains("%")) // means inilization "num a = 10" or "num a = b;"
             {
                 var variable = first_word.Split('=')[0].Trim(); // variable name
                 var value = first_word.Split('=')[1].Trim(); // variable value
@@ -40,6 +39,22 @@ namespace Tokenization
                     lbValid.Text = "Build Failed"; // set the label to build failed
                     MessageBox.Show($"Variable {variable} already exists: ");
                     return false;
+                }
+
+                if (Regex.IsMatch(value, @"^[_A-z]+[_A-z0-9]*$"))
+                {
+                    if (var_value.ContainsKey(value) == false)
+                    {
+                        return false;
+                    }
+                    dtype_var[variable] = datatype; // add to dtype_var dictionary
+                    var_value[variable] = var_value[value]; // add to var_value
+
+                    listBox1.Items.Add(variable);
+                    listBox1.Items.Add("="); // add equal sign
+                    listBox1.Items.Add(var_value[value]);
+
+                    return true;
                 }
                 
 
@@ -108,6 +123,47 @@ namespace Tokenization
             }
         }
 
+        public static object EvaluateExpression_ILine(string expr, Dictionary<string, string> dtype_var, Dictionary<string, string> var_value, string resultVarName)
+        {
+            // Match all variable names
+            var varPattern = new Regex(@"\b[_a-zA-Z][_a-zA-Z0-9]*\b");
+            var matches = varPattern.Matches(expr);
+
+            // Replace variables with values
+            foreach (Match match in matches)
+            {
+                string varName = match.Value;
+
+                if (dtype_var.ContainsKey(varName) &&
+                    (dtype_var[varName] == "num" || dtype_var[varName] == "float" || dtype_var[varName] == "decimal") &&
+                    var_value.ContainsKey(varName))
+                {
+                    expr = Regex.Replace(expr, $@"\b{varName}\b", var_value[varName]);
+                }
+                else
+                {
+                    throw new Exception($"Unsupported or undefined variable: {varName}");
+                }
+            }
+
+            // Check for valid characters
+            if (!Regex.IsMatch(expr, @"^[0-9\+\-\*/%\.\s\(\)]+$"))
+                throw new Exception("Expression contains invalid characters");
+
+            // Evaluate expression
+            var result = new DataTable().Compute(expr, null);
+            double finalValue = Convert.ToDouble(result);
+
+            // Decide return type based on resultVarName's type
+            if (dtype_var.ContainsKey(resultVarName) && (dtype_var[resultVarName] == "num"))
+            {
+                return Convert.ToInt32(finalValue); // return as int
+            }
+
+            return finalValue; // return as double
+        }
+
+
         public  Boolean type_validation(String variable, String value) // used only when inilization "a=10;"
         {
             try
@@ -120,12 +176,62 @@ namespace Tokenization
                         var_value[variable] = value;
                         return true;
                     }
+
+                    if(Regex.IsMatch(value, @"^[_A-z]+[_A-z0-9]*$")) // if the value is a variable name
+                    {
+                        if (var_value.ContainsKey(value) == false) // if the variable does not exist then return false
+                        {
+                            MessageBox.Show($"Variable {value} does not exist: ");
+                            return false;
+                        }
+                        if (dtype_var[value] == "num") // if the variable is of type num then assign its value to the variable
+                        {
+                            var_value[variable] = var_value[value];
+                            return true;
+                        }
+                        else // if the variable is not of type num then return false
+                        {
+                            MessageBox.Show($"Variable {value} is not of type num: ");
+                            return false;
+                        }
+                    }
+
+                    if (value.Contains("+") || value.Contains("-") || value.Contains("*")|| value.Contains("/") || value.Contains("%"))
+                    {
+                        var_value[variable] = EvaluateExpression_ILine(value, dtype_var, var_value, variable).ToString(); ;
+                        return true;
+                    }
                 }
                 else if (dtype_var[variable] == "float" || dtype_var[variable] == "decimal")
                 {
                     if (Regex.IsMatch(value, @"^[0-9]*[0-9]*[.]?[0-9][0-9]*$"))
                     {
                         var_value[variable] = value;
+                        return true;
+                    }
+
+                    if (Regex.IsMatch(value, @"^[_A-z]+[_A-z0-9]*$")) // if the value is a variable name
+                    {
+                        if (var_value.ContainsKey(value) == false) // if the variable does not exist then return false
+                        {
+                            MessageBox.Show($"Variable {value} does not exist: ");
+                            return false;
+                        }
+                        if (dtype_var[value] == "float" || dtype_var[value] == "decimal") // if the variable is of type num then assign its value to the variable
+                        {
+                            var_value[variable] = var_value[value];
+                            return true;
+                        }
+                        else // if the variable is not of type num then return false
+                        {
+                            MessageBox.Show($"Variable {value} is not of type float or decimal: ");
+                            return false;
+                        }
+                    }
+
+                    if (value.Contains("+") || value.Contains("-") || value.Contains("*") || value.Contains("/") || value.Contains("%"))
+                    {
+                        var_value[variable] = EvaluateExpression_ILine(value, dtype_var, var_value, variable).ToString(); ;
                         return true;
                     }
                 }
@@ -154,7 +260,7 @@ namespace Tokenization
                     }
                 }
 
-                MessageBox.Show("Type Mismatch:  " + value);
+                    MessageBox.Show("Type Mismatch:  " + value);
                 return false;
             }
             catch (Exception e)
@@ -166,7 +272,11 @@ namespace Tokenization
 
         public string get_input(string input_str)
         {
-            var extractedText = input_str.Split('"')[1];
+            var extractedText = "";
+            if (input_str.Contains('"'))
+            {
+                extractedText = input_str.Split('"')[1];
+            }
             string userInput = Microsoft.VisualBasic.Interaction.InputBox(
             extractedText,              // Message
             "Input Required",           // Title
@@ -188,13 +298,13 @@ namespace Tokenization
             listBox1.Items.Clear();
 
             //All initialization single
-            Regex ILine = new Regex(@"^[_a-zA-Z][_a-zA-Z0-9]*\s*=\s*((""[^""]*"")|('[^']')|([0-9]*[0-9]*[.]?[0-9][0-9]*)|(true|false))\s*;$");
+            Regex ILine = new Regex(@"^[_a-zA-Z][_a-zA-Z0-9]*\s*=\s*([_a-zA-Z0-9""'().]+(\s*[\+\-\*/%]\s*[_a-zA-Z0-9""'().]+)*)\s*;$");
 
             //int initialization and declaration single and multiple
-            Regex IntIdLine = new Regex(@"^num\s+([_a-zA-Z][_a-zA-Z0-9]*\s*(=\s*[\w\s()+\-*/%]+)?\s*)(,\s*[_a-zA-Z][_a-zA-Z0-9]*\s*(=\s*[\w\s()+\-*/%]+)?\s*)*;$");
-            
+            Regex IntIdLine = new Regex(@"^num\s+([_a-zA-Z][_a-zA-Z0-9]*\s*(=\s*[^,;]+)?\s*)(,\s*[_a-zA-Z][_a-zA-Z0-9]*\s*(=\s*[^,;]+)?\s*)*;$");
+
             //float | decimal initialization and declaration single and multiple
-            Regex FloatIdLine = new Regex(@"^(float|decimal)\s+([_a-zA-Z][_a-zA-Z0-9]*\s*(=\s*[\w\s()+\-*/%.]+)?\s*)(,\s*[_a-zA-Z][_a-zA-Z0-9]*\s*(=\s*[\w\s()+\-*/%.]+)?\s*)*;$");
+            Regex FloatIdLine = new Regex(@"^(float|decimal)\s+([_a-zA-Z][_a-zA-Z0-9]*\s*(=\s*[\w.()]+)?\s*)(,\s*[_a-zA-Z][_a-zA-Z0-9]*\s*(=\s*[\w.()]+)?\s*)*;$");
 
             // text(String) initialization and declaration single and multiple
 
@@ -214,7 +324,7 @@ namespace Tokenization
             Regex printSLine = new Regex(@"^print\s*\(\s*(?:""[^""]*""|\w+||\([^()]*\))(?:\s*[\+\-\*/%]\s*(?:""[^""]*""|\w+|\([^()]*\)))*\s*\)\s*;$");
 
             //"input string"
-            Regex inputLine = new Regex(@"^[_A-z][_A-z0-9]*\s*=\s*input\s*\(\s*""[\w\s=:]*""\s*\)\s*;$");
+            Regex inputLine = new Regex(@"^[_A-Za-z][_A-Za-z0-9]*\s*=\s*input\s*\(\s*("".*?"")?\s*\)\s*;$");
 
             string[] Input = input.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
             richBoxOutput.Text = "";
@@ -239,6 +349,55 @@ namespace Tokenization
                     else // build failed stop the process
                     {
                         break;
+                    }
+                }
+
+                else if (inputLine.IsMatch(line)) // input
+                {
+                    bool got_inp = false;
+                    var words = line.Split('=');
+
+                    if (words.Length > 2)
+                    {
+                        for (int i = 2; i < words.Length; i++)
+                        {
+                            words[1] = words[1] + "=" + words[i];
+                        }
+                    }
+
+                    foreach (var variable in dtype_var.Keys)
+                    {
+                        if (variable == words[0].Trim()) // check is the variable exist or not
+                        {
+                            // if exists then check its type and then assign the value accordingly
+
+                            if (dtype_var[variable] == "num" || dtype_var[variable] == "float" || dtype_var[variable] == "decimal" ||
+                                dtype_var[variable] == "char" || dtype_var[variable] == "bool")
+                            {
+                                String userInput = get_input(words[1]);
+
+                                if (userInput == "") // if no input is entered then return error
+                                {
+                                    lbValid.Text = "Build Failed";
+                                    break;
+                                }
+
+                                if (type_validation(variable, userInput) == true) //  check if the user input is correct and then add input
+                                {
+                                    listBox1.Items.Add(userInput);
+                                    got_inp = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (got_inp == true)
+                    {
+                        lbValid.Text = "Build Sucessfull";
+                    }
+                    else
+                    {
+                        lbValid.Text = "Build Failed";
                     }
                 }
 
@@ -282,55 +441,6 @@ namespace Tokenization
                     {
                         Console.WriteLine($"Error processing '{line}': {ex.Message}");
                         break;       // stop processing any further print()s
-                    }
-                }
-
-                else if (inputLine.IsMatch(line)) // input issue!
-                {
-                    bool got_inp = false;
-                    var words = line.Split('=');
-
-                    if (words.Length > 2)
-                    {
-                        for (int i =2; i < words.Length; i++)
-                        {
-                            words[1] = words[1] + "=" +words[i];
-                        }
-                    }
-
-                    foreach (var variable in dtype_var.Keys)
-                    {
-                        if (variable == words[0].Trim()) // check is the variable exist or not
-                        {
-                            // if exists then check its type and then assign the value accordingly
-
-                            if (dtype_var[variable] == "num" || dtype_var[variable] == "float" || dtype_var[variable] == "decimal" ||
-                                dtype_var[variable] == "char" || dtype_var[variable] == "bool")
-                            {
-                                String userInput = get_input(words[1]);
-
-                                if (userInput == "") // if no input is entered then return error
-                                {
-                                    lbValid.Text = "Build Failed";
-                                    break;
-                                }
-
-                                if (type_validation(variable, userInput) == true) //  check if the user input is correct and then add input
-                                {
-                                    listBox1.Items.Add(userInput);
-                                    got_inp = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    if (got_inp == true)
-                    {
-                        lbValid.Text = "Build Sucessfull";
-                    }
-                    else
-                    {
-                        lbValid.Text = "Build Failed";
                     }
                 }
                 else
@@ -537,6 +647,5 @@ namespace Tokenization
 
             return result;
         }
-
     }
 }
